@@ -1,0 +1,51 @@
+\documentclass{article}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage[margin=1in]{geometry}
+\begin{document}
+
+\begin{table}[tbp] \centering
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+{\tiny
+\begin{tabularx}{\textwidth}{lCCCCCCCCCCCCCC}
+
+\toprule
+{dim}&{sigma}&{AIC}&{AICC}&{BIC}&{EBIC}&{cvlasso}&{cvridge}&{cvelastic}&{rlasso}&{rlassoxdep}&{sqrt}&{sqrtxdep}&{Stepwise}&{Oracle} \tabularnewline
+\midrule\addlinespace[1.5ex]
+$\hat{s}$&.5&37.64&24.78&21.48&20.73&25.35&--&.&20.32&20.4&20.23&20.3&37.22&-- \tabularnewline
+&1&36.61&24.24&21.4&20.72&24.91&--&.&20.26&20.33&20.19&20.27&37.32&-- \tabularnewline
+&2&39.26&24.19&20.95&20.19&24.57&--&.&19.76&19.88&19.64&19.74&33.85&-- \tabularnewline
+&3&33.4&22.32&19.24&18.52&22.92&--&.&18.11&18.26&17.89&18.02&29.76&-- \tabularnewline
+&5&31.96&20.65&16.58&15.65&21.47&--&.&15.16&15.41&14.7&15.01&28.02&-- \tabularnewline
+\midrule False pos.&.5&17.64&4.78&1.48&.73&5.35&--&.&.32&.4&.23&.29&18.22&-- \tabularnewline
+&1&16.61&4.24&1.39&.72&4.91&--&.&.26&.33&.19&.27&18.67&-- \tabularnewline
+&2&19.78&4.59&1.38&.64&4.91&--&.&.28&.36&.21&.26&20.67&-- \tabularnewline
+&3&15.16&4.07&1.16&.6&4.55&--&.&.22&.29&.18&.22&19.76&-- \tabularnewline
+&5&16.3&5.13&1.34&.61&5.68&--&.&.22&.31&.16&.22&20.6&-- \tabularnewline
+\midrule False neg.&.5&0&0&0&0&0&--&.&0&0&0&0&0&-- \tabularnewline
+&1&0&0&0&0&0&--&.&0&0&0&0&.35&-- \tabularnewline
+&2&.52&.4&.43&.46&.35&--&.&.52&.48&.57&.52&5.82&-- \tabularnewline
+&3&1.76&1.75&1.92&2.08&1.63&--&.&2.12&2.04&2.29&2.19&9.01&-- \tabularnewline
+&5&4.34&4.49&4.76&4.95&4.21&--&.&5.07&4.89&5.46&5.2&11.57&-- \tabularnewline
+\midrule Bias&.5&3.095\newline (\emph{4.053})&2.008\newline (\emph{2.229})&1.902\newline (\emph{1.963})&1.887\newline (\emph{1.895})&1.987\newline (\emph{2.251})&5.401\newline (--)&.\newline (\emph{.})&1.947\newline (\emph{1.848})&1.926\newline (\emph{1.858})&1.971\newline (\emph{1.84})&1.941\newline (\emph{1.846})&5.537\newline (--)&1.804\newline (--) \tabularnewline
+&1&6.08\newline (\emph{7.87})&3.985\newline (\emph{4.36})&3.828\newline (\emph{3.907})&3.815\newline (\emph{3.792})&3.964\newline (\emph{4.448})&7.473\newline (--)&.\newline (\emph{.})&3.958\newline (\emph{3.689})&3.913\newline (\emph{3.704})&4.009\newline (\emph{3.676})&3.945\newline (\emph{3.69})&11.651\newline (--)&3.609\newline (--) \tabularnewline
+&2&13.353\newline (\emph{17.725})&8.042\newline (\emph{8.899})&7.65\newline (\emph{7.846})&7.633\newline (\emph{7.628})&7.984\newline (\emph{8.901})&10.46\newline (--)&.\newline (\emph{.})&7.856\newline (\emph{7.511})&7.781\newline (\emph{7.521})&7.941\newline (\emph{7.516})&7.836\newline (\emph{7.502})&28.543\newline (--)&7.366\newline (--) \tabularnewline
+&3&16.316\newline (\emph{20.952})&10.843\newline (\emph{11.95})&10.374\newline (\emph{10.764})&10.327\newline (\emph{10.596})&10.794\newline (\emph{12.068})&11.928\newline (--)&.\newline (\emph{.})&10.465\newline (\emph{10.529})&10.398\newline (\emph{10.495})&10.543\newline (\emph{10.614})&10.451\newline (\emph{10.533})&40.799\newline (--)&10.803\newline (--) \tabularnewline
+&5&25.159\newline (\emph{33.852})&15.792\newline (\emph{18.5})&14.385\newline (\emph{15.48})&14.188\newline (\emph{15.069})&15.505\newline (\emph{18.478})&14.868\newline (--)&.\newline (\emph{.})&14.106\newline (\emph{15.129})&14.062\newline (\emph{14.993})&14.187\newline (\emph{15.363})&14.106\newline (\emph{15.12})&64.529\newline (--)&17.855\newline (--) \tabularnewline
+\midrule RMSE&.5&.217\newline (\emph{.259})&.189\newline (\emph{.208})&.193\newline (\emph{.183})&.199\newline (\emph{.174})&.188\newline (\emph{.21})&.271\newline (--)&.\newline (\emph{.})&.257\newline (\emph{.166})&.242\newline (\emph{.168})&.273\newline (\emph{.166})&.253\newline (\emph{.166})&.296\newline (--)&.163\newline (--) \tabularnewline
+&1&.419\newline (\emph{.502})&.367\newline (\emph{.401})&.376\newline (\emph{.357})&.39\newline (\emph{.34})&.367\newline (\emph{.406})&.466\newline (--)&.\newline (\emph{.})&.509\newline (\emph{.323})&.479\newline (\emph{.325})&.54\newline (\emph{.322})&.5\newline (\emph{.324})&.599\newline (--)&.318\newline (--) \tabularnewline
+&2&.871\newline (\emph{1.045})&.731\newline (\emph{.815})&.751\newline (\emph{.714})&.784\newline (\emph{.68})&.734\newline (\emph{.81})&.805\newline (--)&.\newline (\emph{.})&1.01\newline (\emph{.659})&.952\newline (\emph{.66})&1.073\newline (\emph{.659})&.995\newline (\emph{.659})&1.313\newline (--)&.648\newline (--) \tabularnewline
+&3&1.197\newline (\emph{1.429})&1.057\newline (\emph{1.15})&1.115\newline (\emph{1.007})&1.174\newline (\emph{.971})&1.062\newline (\emph{1.155})&1.102\newline (--)&.\newline (\emph{.})&1.501\newline (\emph{.947})&1.412\newline (\emph{.947})&1.596\newline (\emph{.952})&1.478\newline (\emph{.947})&1.895\newline (--)&.957\newline (--) \tabularnewline
+&5&1.933\newline (\emph{2.393})&1.657\newline (\emph{1.913})&1.689\newline (\emph{1.6})&1.792\newline (\emph{1.513})&1.632\newline (\emph{1.93})&1.667\newline (--)&.\newline (\emph{.})&2.297\newline (\emph{1.467})&2.145\newline (\emph{1.465})&2.46\newline (\emph{1.475})&2.263\newline (\emph{1.467})&3.13\newline (--)&1.615\newline (--) \tabularnewline
+\midrule RMSPE&.5&.242\newline (\emph{.301})&.2\newline (\emph{.224})&.203\newline (\emph{.192})&.209\newline (\emph{.182})&.2\newline (\emph{.226})&.321\newline (--)&.\newline (\emph{.})&.272\newline (\emph{.173})&.256\newline (\emph{.175})&.289\newline (\emph{.173})&.268\newline (\emph{.173})&.37\newline (--)&.17\newline (--) \tabularnewline
+&1&.47\newline (\emph{.586})&.395\newline (\emph{.439})&.4\newline (\emph{.385})&.414\newline (\emph{.364})&.393\newline (\emph{.445})&.526\newline (--)&.\newline (\emph{.})&.539\newline (\emph{.344})&.508\newline (\emph{.347})&.573\newline (\emph{.343})&.531\newline (\emph{.345})&.768\newline (--)&.338\newline (--) \tabularnewline
+&2&.986\newline (\emph{1.226})&.788\newline (\emph{.891})&.806\newline (\emph{.769})&.84\newline (\emph{.727})&.793\newline (\emph{.888})&.868\newline (--)&.\newline (\emph{.})&1.082\newline (\emph{.701})&1.019\newline (\emph{.703})&1.149\newline (\emph{.7})&1.065\newline (\emph{.7})&1.691\newline (--)&.688\newline (--) \tabularnewline
+&3&1.321\newline (\emph{1.622})&1.124\newline (\emph{1.241})&1.181\newline (\emph{1.072})&1.241\newline (\emph{1.028})&1.129\newline (\emph{1.239})&1.172\newline (--)&.\newline (\emph{.})&1.585\newline (\emph{1.002})&1.491\newline (\emph{1.002})&1.684\newline (\emph{1.007})&1.56\newline (\emph{1.001})&2.416\newline (--)&1.015\newline (--) \tabularnewline
+&5&2.107\newline (\emph{2.677})&1.74\newline (\emph{2.02})&1.771\newline (\emph{1.67})&1.878\newline (\emph{1.574})&1.712\newline (\emph{2.043})&1.735\newline (--)&.\newline (\emph{.})&2.416\newline (\emph{1.525})&2.255\newline (\emph{1.523})&2.589\newline (\emph{1.534})&2.381\newline (\emph{1.525})&3.968\newline (--)&1.694\newline (--) \tabularnewline
+\bottomrule \addlinespace[1.5ex]
+
+\end{tabularx}
+}
+\end{table}
+\end{document}

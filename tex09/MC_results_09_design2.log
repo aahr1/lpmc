@@ -1,0 +1,522 @@
+This is pdfTeX, Version 3.14159265-2.6-1.40.18 (MiKTeX 2.9.6350) (preloaded format=pdflatex 2017.9.4)  27 SEP 2018 15:03
+entering extended mode
+**./MC_results_09_design2.tex
+(MC_results_09_design2.tex
+LaTeX2e <2017-04-15>
+Babel <3.10> and hyphenation patterns for 1 language(s) loaded.
+
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\base\article.c
+ls"
+Document Class: article 2014/09/29 v1.4h Standard LaTeX document class
+
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\base\size10.cl
+o"
+File: size10.clo 2014/09/29 v1.4h Standard LaTeX file (size option)
+)
+\c@part=\count79
+\c@section=\count80
+\c@subsection=\count81
+\c@subsubsection=\count82
+\c@paragraph=\count83
+\c@subparagraph=\count84
+\c@figure=\count85
+\c@table=\count86
+\abovecaptionskip=\skip41
+\belowcaptionskip=\skip42
+\bibindent=\dimen102
+)
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\booktabs\bookt
+abs.sty"
+Package: booktabs 2005/04/14 v1.61803 publication quality tables
+\heavyrulewidth=\dimen103
+\lightrulewidth=\dimen104
+\cmidrulewidth=\dimen105
+\belowrulesep=\dimen106
+\belowbottomsep=\dimen107
+\aboverulesep=\dimen108
+\abovetopsep=\dimen109
+\cmidrulesep=\dimen110
+\cmidrulekern=\dimen111
+\defaultaddspace=\dimen112
+\@cmidla=\count87
+\@cmidlb=\count88
+\@aboverulesep=\dimen113
+\@belowrulesep=\dimen114
+\@thisruleclass=\count89
+\@lastruleclass=\count90
+\@thisrulewidth=\dimen115
+)
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\tools\tabularx
+.sty"
+Package: tabularx 2016/02/03 v2.11 `tabularx' package (DPC)
+
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\tools\array.st
+y"
+Package: array 2016/10/06 v2.4d Tabular extension package (FMi)
+\col@sep=\dimen116
+\extrarowheight=\dimen117
+\NC@list=\toks14
+\extratabsurround=\skip43
+\backup@length=\skip44
+)
+\TX@col@width=\dimen118
+\TX@old@table=\dimen119
+\TX@old@col=\dimen120
+\TX@target=\dimen121
+\TX@delta=\dimen122
+\TX@cols=\count91
+\TX@ftn=\toks15
+)
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\geometry\geome
+try.sty"
+Package: geometry 2010/09/12 v5.6 Page Geometry
+
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\graphics\keyva
+l.sty"
+Package: keyval 2014/10/28 v1.15 key=value parser (DPC)
+\KV@toks@=\toks16
+)
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\generic\oberdiek\ifp
+df.sty"
+Package: ifpdf 2017/03/15 v3.2 Provides the ifpdf switch
+)
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\generic\oberdiek\ifv
+tex.sty"
+Package: ifvtex 2016/05/16 v1.6 Detect VTeX and its facilities (HO)
+Package ifvtex Info: VTeX not detected.
+)
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\generic\ifxetex\ifxe
+tex.sty"
+Package: ifxetex 2010/09/12 v0.6 Provides ifxetex conditional
+)
+\Gm@cnth=\count92
+\Gm@cntv=\count93
+\c@Gm@tempcnt=\count94
+\Gm@bindingoffset=\dimen123
+\Gm@wd@mp=\dimen124
+\Gm@odd@mp=\dimen125
+\Gm@even@mp=\dimen126
+\Gm@layoutwidth=\dimen127
+\Gm@layoutheight=\dimen128
+\Gm@layouthoffset=\dimen129
+\Gm@layoutvoffset=\dimen130
+\Gm@dimlist=\toks17
+
+("C:\Users\Achim.Ahrens\Miktex portable\texmfs\install\tex\latex\geometry\geome
+try.cfg")) (MC_results_09_design2.aux)
+\openout1 = `MC_results_09_design2.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+
+*geometry* driver: auto-detecting
+*geometry* detected driver: pdftex
+*geometry* verbose mode - [ preamble ] result:
+* driver: pdftex
+* paper: <default>
+* layout: <same size as paper>
+* layoutoffset:(h,v)=(0.0pt,0.0pt)
+* modes: 
+* h-part:(L,W,R)=(72.26999pt, 469.75502pt, 72.26999pt)
+* v-part:(T,H,B)=(72.26999pt, 650.43001pt, 72.26999pt)
+* \paperwidth=614.295pt
+* \paperheight=794.96999pt
+* \textwidth=469.75502pt
+* \textheight=650.43001pt
+* \oddsidemargin=0.0pt
+* \evensidemargin=0.0pt
+* \topmargin=-37.0pt
+* \headheight=12.0pt
+* \headsep=25.0pt
+* \topskip=10.0pt
+* \footskip=30.0pt
+* \marginparwidth=65.0pt
+* \marginparsep=11.0pt
+* \columnsep=10.0pt
+* \skip\footins=9.0pt plus 4.0pt minus 2.0pt
+* \hoffset=0.0pt
+* \voffset=0.0pt
+* \mag=1000
+* \@twocolumnfalse
+* \@twosidefalse
+* \@mparswitchfalse
+* \@reversemarginfalse
+* (1in=72.27pt=25.4mm, 1cm=28.453pt)
+
+
+Overfull \hbox (1.92256pt too wide) in paragraph at lines 38--38
+ []|\OT1/cmr/m/n/5 cvlasso| 
+ []
+
+
+Overfull \hbox (2.54756pt too wide) in paragraph at lines 38--38
+ []|\OT1/cmr/m/n/5 cvridge| 
+ []
+
+
+Overfull \hbox (6.43646pt too wide) in paragraph at lines 38--38
+ []|\OT1/cmr/m/n/5 cvelastic| 
+ []
+
+
+Overfull \hbox (11.95741pt too wide) in paragraph at lines 38--38
+ []|\OT1/cmr/m/n/5 rlassoxdep| 
+ []
+
+
+Overfull \hbox (6.85316pt too wide) in paragraph at lines 38--38
+ []|\OT1/cmr/m/n/5 sqrtxdep| 
+ []
+
+
+Overfull \hbox (6.67955pt too wide) in paragraph at lines 38--38
+ []|\OT1/cmr/m/n/5 Stepwise| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 5.719\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 3.087\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 3.033\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 3.405\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 3.063\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 3.042\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 3.074\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 3.062\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.946\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 5.419\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 4.889\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 4.807\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 5.396\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 4.813\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 4.793\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 4.816\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 15.539\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.436\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 7.289\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 7.184\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.688\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 7.149\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 7.147\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 7.254\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 7.147\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 21.235\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.263\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.785\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.689\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.475\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.642\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.601\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 8.637\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 24.124\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 13.536\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.723\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.612\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 12.648\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.403\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.467\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.482\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (3.981pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 10.428\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.422\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.108\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 2.104\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.407\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.411\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.687\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.348\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.341\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.382\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.355\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.135\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.622\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.172\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.182\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 2.289\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.802\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.452\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.461\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.763\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.389\OT1/cmr/m/n/5 )| 
+ []
+
+
+Overfull \hbox (0.9651pt too wide) in paragraph at lines 38--38
+ \OT1/cmr/m/n/5 (\OT1/cmr/m/it/5 1.398\OT1/cmr/m/n/5 )| 
+ []
+
+[1{C:/Users/Achim.Ahrens/Miktex portable/texmfs/data/pdftex/config/pdftex.map}]
+(MC_results_09_design2.aux) ) 
+Here is how much of TeX's memory you used:
+ 879 strings out of 495222
+ 12671 string characters out of 3180468
+ 147712 words of memory out of 3000000
+ 4226 multiletter control sequences out of 15000+200000
+ 3989 words of font info for 15 fonts, out of 3000000 for 9000
+ 14 hyphenation exceptions out of 8191
+ 24i,9n,32p,405b,326s stack positions out of 5000i,500n,10000p,200000b,50000s
+<C:/Users/Achim.Ahrens/Miktex portable/texmfs/inst
+all/fonts/type1/public/amsfonts/cm/cmmi5.pfb><C:/Users/Achim.Ahrens/Miktex port
+able/texmfs/install/fonts/type1/public/amsfonts/cm/cmr10.pfb><C:/Users/Achim.Ah
+rens/Miktex portable/texmfs/install/fonts/type1/public/amsfonts/cm/cmr5.pfb><C:
+/Users/Achim.Ahrens/Miktex portable/texmfs/install/fonts/type1/public/amsfonts/
+cm/cmti7.pfb>
+Output written on MC_results_09_design2.pdf (1 page, 43897 bytes).
+PDF statistics:
+ 22 PDF objects out of 1000 (max. 8388607)
+ 0 named destinations out of 1000 (max. 500000)
+ 1 words of extra memory for PDF output out of 10000 (max. 10000000)
+

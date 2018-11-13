@@ -1,0 +1,104 @@
+\documentclass[]{beamer} % "t" for vertical alignment 
+\usepackage[latin1]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+%\usepackage{setspace}
+\usepackage{bbm}
+\usepackage  {graphicx}
+\usepackage  {epstopdf}
+\usepackage[authoryear,round]{natbib}
+\usepackage{xcolor}
+%\usepackage{listings}
+\usepackage{csquotes}
+%\usepackage[natbib=true,style=authoryear,backend=bibtex8,
+%sorting=nyt,doi=false,isbn=false,url=true,abbreviate=true,eprint=false]{biblatex}
+\usepackage{rotating}
+\usepackage{tabularx}
+%\usepackage{upgreek}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{xspace}
+%\usepackage{overpic}
+\usepackage{url}
+\usepackage{tikz}
+\usepackage{multirow}
+%\setbeameroption{show notes}
+ \usepackage{colortbl}
+\usepackage[normalem]{ulem}
+\usepackage{caption}\captionsetup{font=scriptsize,labelfont=scriptsize}
+\usepackage{bm}
+\usepackage{kbordermatrix}
+
+\bibliographystyle{unsrtnat}
+
+\usetheme{default}
+\beamertemplatenavigationsymbolsempty
+\usecolortheme{seagull}
+\usefonttheme{serif} %{serif} % structurebold
+\usenavigationsymbolstemplate{}
+\setbeamertemplate{footline}[frame number]
+%\setbeamertemplate{footline}{goo \hfill \insertframenumber}
+
+\addtobeamertemplate{block begin}{\setlength\abovedisplayskip{0pt}}
+
+\graphicspath{{C:/Users/Achim.Ahrens/Dropbox/StataLasso/Current/Do_files/mc7-fig/}}
+
+\newcommand{\designone}[2]{%
+\begin{frame}
+\frametitle{#2}
+\includegraphics[height=.45\textheight]{{design1_#1}.pdf}
+\end{frame}}
+
+\newcommand{\designtwo}[2]{%
+\begin{frame}
+\frametitle{#2}
+\includegraphics[height=.6\textheight]{{design2_#1}.pdf}
+\end{frame}}
+
+\begin{document}
+
+\begin{frame}
+\frametitle{Design 1 and 2}
+\begin{align}
+y_i=1+\sum_{j=1}^p \beta_j x_{ij} + \varepsilon_i,  \varepsilon_i\sim N(0,\sigma^2) 
+\end{align}
+$p=100,  \sigma=\{0.5,1,2,3,5\}, cor(x_j,x_s)=\theta^{|j-s|}$
+
+\bigskip
+
+Estimation sample: 200.
+Validation sample: 200.
+
+\bigskip
+
+Design 1: $\beta_j = 1\{j\leq 20\}, s=20.$\\
+Design 2: $\beta_j = (0.5)^j.$
+\end{frame}
+
+\designone{sigma.5_theta.7}{Design 1, sigma=.5, theta=.7}
+\designone{sigma1_theta.7}{Design 1, sigma=1, theta=.7}
+\designone{sigma2_theta.7}{Design 1, sigma=2, theta=.7}
+\designone{sigma3_theta.7}{Design 1, sigma=3, theta=.7}
+\designone{sigma5_theta.7}{Design 1, sigma=5, theta=.7}
+
+%\designone{sigma.5_theta.9}{Design 1, sigma=.5, theta=.9}
+%\designone{sigma1_theta.9}{Design 1, sigma=1, theta=.9}
+%\designone{sigma2_theta.9}{Design 1, sigma=2, theta=.9}
+%\designone{sigma3_theta.9}{Design 1, sigma=3, theta=.9}
+%\designone{sigma5_theta.9}{Design 1, sigma=5, theta=.9}
+
+\designtwo{sigma.5_theta.7}{Design 2, sigma=.5, theta=.7}
+\designtwo{sigma1_theta.7}{Design 2, sigma=1, theta=.7}
+\designtwo{sigma2_theta.7}{Design 2, sigma=2, theta=.7}
+\designtwo{sigma3_theta.7}{Design 2, sigma=3, theta=.7}
+\designtwo{sigma5_theta.7}{Design 2, sigma=5, theta=.7}
+
+%\designtwo{sigma.5_theta.9}{Design 2, sigma=.5, theta=.9}
+%\designtwo{sigma1_theta.9}{Design 2, sigma=1, theta=.9}
+%\designtwo{sigma2_theta.9}{Design 2, sigma=2, theta=.9}
+%\designtwo{sigma3_theta.9}{Design 2, sigma=3, theta=.9}
+%\designtwo{sigma5_theta.9}{Design 2, sigma=5, theta=.9}
+
+
+\end{document}
+

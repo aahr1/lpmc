@@ -1,0 +1,1088 @@
+------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_log_p100_alter1_design1.log
+  log type:  text
+ opened on:  11 Oct 2018, 19:06:29
+
+. 
+. cd
+C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC
+
+. 
+. which lasso2
+c:\ado\plus\l\lasso2.ado
+*! lasso2 1.0.06 4sep2018
+*! authors aa/ms
+
+. which cvlasso
+c:\ado\plus\c\cvlasso.ado
+*! lassocv 1.0.06 22apr2018
+*! authors aa/ms
+
+. which rlasso
+c:\ado\plus\r\rlasso.ado
+*! rlasso 1.0.07 29aug2018
+*! authors aa/cbh/ms
+
+. which lassoutils
+c:\ado\plus\l\lassoutils.ado
+*! lassoutils 1.0.14 5sep2018
+*! authors aa/cbh/ms
+
+. 
+. * p is equal to:
+. di `thep'
+100
+
+. * design:
+. di `thedesign'
+1
+
+. * alternating beta
+. di `thealternate'
+1
+
+. 
+. set seed 666 // the number of the beast
+
+. 
+. * program to calculate L1 error
+. cap program drop comparevec
+
+. program define comparevec , rclass
+  1.         syntax ,  TRUEMATname(string) ESTMATname(string) 
+  2.         
+.         tempname truemat estmat 
+  3.         mat `truemat'   = `truematname'
+  4.         mat `estmat'    = `estmatname'
+  5. 
+.         // compare dim
+.         local ptrue = colsof(`truemat')
+  6.         local pest  = colsof(`estmat')
+  7.         assert `ptrue'==`pest'
+  8.         
+.         // don't include constant in L1-norm 
+.         // constant is always in last column of estimated beta and true beta
+.         local pcheck = `pest' - 1
+  9. 
+.         
+.         local l1norm = 0
+ 10.         forvalues i = 1(1)`pcheck' {
+ 11.                 local l1norm = `l1norm' + abs(el(`truemat',1,`i')-el(`estmat',1,`i'))
+ 12.         }
+ 13.         return scalar l1norm = `l1norm' // l1 norm
+ 14.         
+. end
+
+. 
+. * program to calculate rmse
+. cap program drop getrmse
+
+. program define getrmse , rclass
+  1.         syntax varlist(min=2 max=2) , ///
+>                         esample(varlist min=1 max=1) // estimation smpl
+  2.         
+.         local xb                : word 1 of `varlist'
+  3.         local xbhat     : word 2 of `varlist'
+  4.         
+.         // calculate in-sample rmse
+.         tempvar pe 
+  5.         gen double `pe' = (`xb'-`xbhat')^2 if `esample'==1
+  6.         sum `pe', meanonly
+  7.         local rmse = sqrt(r(mean))
+  8.         
+.         // calculate out-of-sample rmse
+.         tempvar pe_oos
+  9.         gen double `pe_oos' = (`xb'-`xbhat')^2 if `esample'==0
+ 10.         sum `pe_oos', meanonly
+ 11.         local rmse_oos = sqrt(r(mean))
+ 12.         
+.         return scalar rmse = `rmse'                      
+ 13.         return scalar rmse_oos = `rmse_oos'
+ 14. end
+
+. 
+. cap program drop makebAll
+
+. program define makebAll, rclass
+  1. 
+.         syntax , best(string) allvars(string)
+  2.         
+.         // number of vars (incl constant)
+.         local p : word count `allvars'
+  3. 
+.         tempname b bAll 
+  4.         mat `b' = `best'
+  5.         
+.         // selected vars
+.         local sel : colnames `b'
+  6.         
+.         // create empty full beta vector
+.         mat `bAll' = J(1,`p',0)
+  7.         mat colnames `bAll' = `allvars'
+  8.         
+.         // fill long beta vector
+.         foreach i of local sel {
+  9.                 //di "`i'"
+.                 local bix = colnumb(`b',"`i'")
+ 10.                 local bAllix = colnumb(`bAll',"`i'")
+ 11.                 mat `bAll'[1,`bAllix']=`b'[1,`bix']
+ 12.         }
+ 13.         //mat list `bAll'
+.         
+.         // return
+.         return matrix bAll = `bAll'
+ 14.         return local sel `sel'
+ 15.         //return scalar p = `p'
+. end 
+
+. 
+. cap program drop mysim
+
+. program define mysim, rclass
+  1.      syntax [, obs(integer 100)         /// total number of obs
+>                                 tobs(integer 50)        /// size of estimation sample
+>                                 p(integer 30)           /// ex constant
+>                                 design(integer 1)       /// 1 or 2
+>                                 s(integer 20)           /// sparsity (only relevant if design=1)
+>                                 delta(real 0.9)         /// determines rate at which beta decreases
+>                                                                         /// (only relevant if design!=1)
+>                                 theta(real 0.9)         /// determines corr of X
+>                                 sigma(real 1)           ///
+>                                 ALTernate(integer 1) ]
+  2. 
+.         drop _all
+  3.         
+.         set obs `obs'
+  4.         
+.         ** create beta
+.         tempname BETA
+  5.         if (`design'==1) {
+  6.                 // sparse beta
+.                 mat `BETA' = J(1,`p'+1,0)
+  7.                 forvalues j=1(1)`s' {
+  8.                         mat `BETA'[1,`j'] = 1
+  9.                 }
+ 10.                 *
+.                 mat `BETA'[1,`p'+1] = 1 // constant
+ 11.         }
+ 12.         else {
+ 13.                 // dense beta
+.                 // with beta(j)=(delta)^j and delta<1
+.                 mat `BETA' = J(1,`p'+1,0)
+ 14.                 forvalues j=1(1)`p' {
+ 15.                         mat `BETA'[1,`j'] = (`delta')^(`j')
+ 16.                 }
+ 17.                 *
+.                 mat `BETA'[1,`p'+1] = 1 // constant     
+ 18.         }
+ 19.         *
+.         
+.         // correlation matrix
+.         // theta controls the degree of correlation in X
+.         tempname CORR
+ 20.         tempname cvec Cmat
+ 21.         mata: `cvec'=J(1,`p',0)
+ 22.         mata: for (i=1; i<=`p'; i++) `cvec'[1,i]=(`theta')^(i-1)
+ 23.         mata: `Cmat'=Toeplitz((`cvec')',`cvec')
+ 24.         mata: st_matrix("`CORR'",`Cmat')        
+ 25.         *
+.         
+.         ************* generate data ************************************************
+.         // gen e
+.         gen double e = rnormal()*`sigma'
+ 26.         // create x
+.         drawnorm x1-x`p' , double corr(`CORR')
+ 27.         // create xb
+.         gen double f = el(`BETA',1,`p'+1) // = the intercept (in last column)
+ 28.         forvalues j=1(1)`p' {
+ 29.                 replace f = f + x`j'*el(`BETA',1,`j')*(`alternate')^(`j')
+ 30.         }
+ 31.         // generate y
+.         gen y = f + e 
+ 32.         drop e 
+ 33.         drop f
+ 34.         // estimation and validation sample
+.         tempvar esample vsample
+ 35.         gen `esample' = 0
+ 36.         replace `esample' = 1 if _n <= `tobs'
+ 37.         gen `vsample' = 0 
+ 38.         replace `vsample' = 1 if _n > `tobs'
+ 39.         ************* generate data end ********************************************
+.         
+.         // oracle estimator
+.         if (`design'==1) {
+ 40.                 reg y x1-x`s' if `esample'
+ 41.                 tempvar xb_oracle
+ 42.                 predict double `xb_oracle', xb
+ 43.                 mat beta_oracle = e(b)
+ 44.                 // add zeros to create full/large beta vector
+.                 mat zeros = J(1,`p'-`s',0) 
+ 45.                 mat beta_oracle = (beta_oracle[1,1..`s'],zeros,beta_oracle[1,`s'+1])
+ 46.                 local shat_oracle = `s'
+ 47.                 ds x1-x`s'
+ 48.                 local sel_oracle = r(varlist)
+ 49.                 local oraclelocal oracle
+ 50.         }
+ 51.         else {
+ 52.                 local oraclelocal
+ 53.         }
+ 54.         *
+.         
+.         // stepwise
+.         if (`p'<`tobs') { // only if p<n
+ 55.                  timer on 11
+ 56.                 stepwise, pr(.1): reg y x1-x`p' if `esample'
+ 57.                  timer off 11
+ 58.                 local shat_swise = e(df_m)
+ 59.                 tempvar xb_swise
+ 60.                 predict double `xb_swise', xb
+ 61.                 ds x1-x`p'
+ 62.                 local allreg = r(varlist) // list of regressors
+ 63.                 mat beta_swise0 = e(b) // "reduced" beta without zeros
+ 64.                 makebAll , best(beta_swise0) allvars("`allreg' _cons") // convert to long beta with zeros
+ 65.                 mat beta_swise = r(bAll)
+ 66.                 local sel_swise = r(sel)
+ 67.                 local swiselocal swise
+ 68.         }
+ 69.         else {
+ 70.                 local swiselocal
+ 71.         }
+ 72.         *
+.         
+.         // rlasso
+.         ereturn clear
+ 73.          timer on 1
+ 74.         rlasso y x1-x`p' if `esample'
+ 75.          timer off 1
+ 76.         local shat_rlasso = e(s)
+ 77.         local sel_rlasso = e(selected)
+ 78.         tempvar xb_rlasso xb_rlasso_ols
+ 79.         predict double `xb_rlasso', xb
+ 80.         predict double `xb_rlasso_ols', xb ols
+ 81.         mat beta_rlasso         = e(betaAll)
+ 82.         mat beta_rlasso_ols     = e(betaAllOLS)
+ 83.         
+.         // sqrt rlasso
+.         ereturn clear
+ 84.          timer on 2
+ 85.         rlasso y x1-x`p' if `esample', sqrt
+ 86.          timer off 2
+ 87.         local shat_sqrt = e(s)
+ 88.         local sel_sqrt = e(selected)
+ 89.         tempvar xb_sqrt xb_sqrt_ols
+ 90.         predict double `xb_sqrt', xb
+ 91.         predict double `xb_sqrt_ols', xb ols
+ 92.         mat beta_sqrt           = e(betaAll)
+ 93.         mat beta_sqrt_ols       = e(betaAllOLS)
+ 94.         
+.         // rlasso with xdep
+.         ereturn clear
+ 95.          timer on 3
+ 96.         rlasso y x1-x`p' if `esample', xdep
+ 97.          timer off 3
+ 98.         local shat_rxdep = e(s)
+ 99.         local sel_rxdep = e(selected)
+100.         tempvar xb_rxdep xb_rxdep_ols
+101.         predict double `xb_rxdep', xb
+102.         predict double `xb_rxdep_ols', xb ols
+103.         mat beta_rxdep  = e(betaAll)
+104.         mat beta_rxdep_ols      = e(betaAllOLS)
+105.         
+.         // sqrt rlasso with xdep
+.         ereturn clear
+106.          timer on 4
+107.         rlasso y x1-x`p' if `esample', sqrt xdep
+108.          timer off 4
+109.         local shat_sxdep = e(s)
+110.         local sel_sxdep = e(selected)
+111.         tempvar xb_sxdep xb_sxdep_ols
+112.         predict double `xb_sxdep', xb
+113.         predict double `xb_sxdep_ols', xb ols
+114.         mat beta_sxdep          = e(betaAll)
+115.         mat beta_sxdep_ols      = e(betaAllOLS)
+116. 
+.         // cvlasso
+.         ereturn clear
+117.          timer on 5
+118.         cvlasso y x1-x`p' if `esample', ///
+>                                 lopt postest nfolds(5) nopath alpha(1)
+119.          timer off 5
+120.         local shat_cvlasso = e(s)
+121.         local sel_cvlasso = e(selected)
+122.         tempvar xb_cvlasso xb_cvlasso_ols
+123.         predict double `xb_cvlasso', xb
+124.         predict double `xb_cvlasso_ols', xb ols
+125.         mat beta_cvlasso                = e(betaAll)
+126.         mat beta_cvlasso_ols    = e(betaAllOLS)
+127. 
+.         // cv+ridge
+.         ereturn clear
+128.          timer on 6
+129.         cvlasso y x1-x`p' if `esample', ///
+>                                 lopt postest nfolds(5) nopath alpha(0)
+130.          timer off 6
+131.         local shat_cvridge = e(s)
+132.         local sel_cvridge = e(selected)
+133.         tempvar xb_cvridge 
+134.         predict double `xb_cvridge', xb
+135.         mat beta_cvridge        = e(betaAll)
+136.         local cvridgelocal cvridge
+137.                 
+.         // cv+elastic
+.         /*
+>         ereturn clear
+>         timer on 7
+>         cvlasso y x1-x`p' if `esample', ///
+>                                 lopt postest nfolds(5) nopath alpha(0 0.1 0.5 0.9 1)
+>         timer off 7
+>         local shat_cvelastic = e(s)
+>         local sel_cvelastic = e(selected)
+>         tempvar xb_cvelastic xb_cvelastic_ols
+>         predict double `xb_cvelastic', xb
+>         predict double `xb_cvelastic_ols', xb ols
+>         mat beta_cvelastic              = e(betaAll)
+>         mat beta_cvelastic_ols  = e(betaAllOLS)
+>         */
+. 
+.         // lasso2 
+.         tempname lasso2est
+138.         ereturn clear
+139.          timer on 8
+140.         lasso2 y x1-x`p' if `esample', 
+141.          timer off 8
+142.         estimates store `lasso2est'
+143.         
+.                 // with aic 
+.                  timer on 9
+144.                 lasso2, lic(aic) postest
+145.                  timer off 9
+146.                 local shat_aic = e(s)
+147.                 local sel_aic = e(selected)
+148.                 tempvar xb_aic xb_aic_ols
+149.                 predict double `xb_aic', xb
+150.                 predict double `xb_aic_ols', xb  ols
+151.                 mat beta_aic            = e(betaAll)
+152.                 mat beta_aic_ols        = e(betaAllOLS)
+153.                 
+.                 // with bic
+.                 estimates restore `lasso2est'
+154.                 lasso2, lic(bic) postest
+155.                 local shat_bic = e(s)
+156.                 local sel_bic = e(selected)
+157.                 tempvar xb_bic xb_bic_ols
+158.                 predict double `xb_bic', xb
+159.                 predict double `xb_bic_ols', xb ols
+160.                 mat beta_bic            = e(betaAll)
+161.                 mat beta_bic_ols        = e(betaAllOLS)
+162.                 
+.                 // with ebic
+.                 estimates restore `lasso2est'
+163.                 lasso2, lic(ebic) postest
+164.                 local shat_ebic = e(s)
+165.                 local sel_ebic = e(selected)
+166.                 tempvar xb_ebic xb_ebic_ols
+167.                 predict double `xb_ebic', xb
+168.                 predict double `xb_ebic_ols', xb ols
+169.                 mat beta_ebic           = e(betaAll)
+170.                 mat beta_ebic_ols       = e(betaAllOLS)
+171.                 
+.                 // with aicc
+.                 estimates restore `lasso2est'
+172.                 lasso2, lic(aicc) postest
+173.                 local shat_aicc = e(s)
+174.                 local sel_aicc = e(selected)
+175.                 tempvar xb_aicc xb_aicc_ols
+176.                 predict double `xb_aicc', xb
+177.                 predict double `xb_aicc_ols', xb ols
+178.                 mat beta_aicc           = e(betaAll)
+179.                 mat beta_aicc_ols       = e(betaAllOLS)
+180.         
+.         ereturn clear // otherwise lasso2/cvlasso/results are returned
+181.         
+.         ** calculate false positive and false negative
+.         foreach mthd of newlist  `swiselocal' ///
+>                                                         ebic aic bic aicc /// 
+>                                                         cvlasso /// cvelastic ///
+>                                                         rlasso sqrt ///
+>                                                         rxdep sxdep ///
+>                                                         {
+182.                 if (`design'==1) {
+183.                         local fpos_vars: list sel_`mthd' - sel_oracle                           
+184.                         local fneg_vars: list sel_oracle - sel_`mthd' 
+185.                         local fpos_`mthd'       : word count `fpos_vars'
+186.                         local fneg_`mthd'       : word count `fneg_vars'
+187.                 }
+188.                 else {
+189.                         // placeholder
+.                         local fpos_`mthd' = -1
+190.                         local fneg_`mthd' = -1
+191.                 }
+192.         
+.         }
+193.         *
+.         *** calculate L1norm and RMSE
+.         foreach mthd of newlist `oraclelocal' ///
+>                                                         `swiselocal' /// 
+>                                                         rlasso rlasso_ols ///
+>                                                         rxdep rxdep_ols ///
+>                                                         sqrt sqrt_ols ///
+>                                                         sxdep sxdep_ols /// 
+>                                                         cvlasso cvlasso_ols ///
+>                                                         `cvridgelocal' ///
+>                                                         /// cvelastic cvelastic_ols ///
+>                                                         aic aic_ols /// 
+>                                                         bic bic_ols ///
+>                                                         aicc aicc_ols ///
+>                                                         ebic ebic_ols {
+194.                 
+.                 // compare true beta and beta-hat
+.                 di "`mthd'"
+195.                 comparevec, truemat(`BETA') estmat(beta_`mthd')
+196.                 local l1norm_`mthd'     = r(l1norm)
+197.                 return scalar l1norm_`mthd'     =`l1norm_`mthd'' 
+198.                 
+.                 // get rmse
+.                 getrmse y `xb_`mthd'', esample(`esample')
+199.                 local rmse_`mthd'               = r(rmse)
+200.                 local rmse_oos_`mthd'   = r(rmse_oos)           
+201.                 return scalar rmse_`mthd'               =`rmse_`mthd'' 
+202.                 return scalar rmse_oos_`mthd'   =`rmse_oos_`mthd'' 
+203.         }
+204.         *
+.         *** return fpos, fneg and shat
+.         foreach mthd of newlist `swiselocal' ///
+>                                                         ebic aic bic aicc /// 
+>                                                         cvlasso /// cvelastic ///
+>                                                         rlasso sqrt ///
+>                                                         rxdep sxdep /// 
+>                                                         {
+205.         
+.                 return scalar fpos_`mthd' = `fpos_`mthd''
+206.                 return scalar fneg_`mthd' = `fneg_`mthd''
+207.                 return scalar shat_`mthd' = `shat_`mthd''
+208.         }
+209.         *
+.         // return simulation parameters
+.         return scalar obs = `obs'
+210.         return scalar p = `p'
+211.         return scalar design = `design'
+212.         return scalar sigma = `sigma'
+213.         return scalar theta = `theta'
+214.         return scalar alternate = `alternate'
+215.         if (`design'==1) {
+216.                 return scalar s = `s'
+217.                 return scalar delta = -1
+218.         }
+219.         else {
+220.                 return scalar s = -1
+221.                 return scalar delta = `delta'
+222.         }
+223. end
+
+. 
+. ***************** end of program definitions ***********************************
+. 
+. timer clear
+
+. 
+. local mc=1
+
+. foreach s in 0.5 1 2 3 5 {
+  2.         
+.         simulate , reps(300): mysim, obs(400) tobs(200) p(`thep') design(`thedesign') sigma(`s') alter(`thealternate')
+  3.         save "`c(pwd)'\out11\mc_p`thep'_alter`thealternate'_design`thedesign'_`mc'.dta", replace
+  4.         local mc = `mc' + 1     
+  5.         
+. }
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(0.5) alter(1)
+           delta:  r(delta)
+               s:  r(s)
+       alternate:  r(alternate)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+      shat_sxdep:  r(shat_sxdep)
+      fneg_sxdep:  r(fneg_sxdep)
+      fpos_sxdep:  r(fpos_sxdep)
+      shat_rxdep:  r(shat_rxdep)
+      fneg_rxdep:  r(fneg_rxdep)
+      fpos_rxdep:  r(fpos_rxdep)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+      shat_swise:  r(shat_swise)
+      fneg_swise:  r(fneg_swise)
+      fpos_swise:  r(fpos_swise)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sxdep~s:  r(rmse_oos_sxdep_ols)
+  rmse_sxdep_ols:  r(rmse_sxdep_ols)
+l1norm_sxdep_ols:  r(l1norm_sxdep_ols)
+  rmse_oos_sxdep:  r(rmse_oos_sxdep)
+      rmse_sxdep:  r(rmse_sxdep)
+    l1norm_sxdep:  r(l1norm_sxdep)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rxdep~s:  r(rmse_oos_rxdep_ols)
+  rmse_rxdep_ols:  r(rmse_rxdep_ols)
+l1norm_rxdep_ols:  r(l1norm_rxdep_ols)
+  rmse_oos_rxdep:  r(rmse_oos_rxdep)
+      rmse_rxdep:  r(rmse_rxdep)
+    l1norm_rxdep:  r(l1norm_rxdep)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+  rmse_oos_swise:  r(rmse_oos_swise)
+      rmse_swise:  r(rmse_swise)
+    l1norm_swise:  r(l1norm_swise)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (300)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+..................................................   150
+..................................................   200
+..................................................   250
+..................................................   300
+(note: file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_1.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_1.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(1) alter(1)
+           delta:  r(delta)
+               s:  r(s)
+       alternate:  r(alternate)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+      shat_sxdep:  r(shat_sxdep)
+      fneg_sxdep:  r(fneg_sxdep)
+      fpos_sxdep:  r(fpos_sxdep)
+      shat_rxdep:  r(shat_rxdep)
+      fneg_rxdep:  r(fneg_rxdep)
+      fpos_rxdep:  r(fpos_rxdep)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+      shat_swise:  r(shat_swise)
+      fneg_swise:  r(fneg_swise)
+      fpos_swise:  r(fpos_swise)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sxdep~s:  r(rmse_oos_sxdep_ols)
+  rmse_sxdep_ols:  r(rmse_sxdep_ols)
+l1norm_sxdep_ols:  r(l1norm_sxdep_ols)
+  rmse_oos_sxdep:  r(rmse_oos_sxdep)
+      rmse_sxdep:  r(rmse_sxdep)
+    l1norm_sxdep:  r(l1norm_sxdep)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rxdep~s:  r(rmse_oos_rxdep_ols)
+  rmse_rxdep_ols:  r(rmse_rxdep_ols)
+l1norm_rxdep_ols:  r(l1norm_rxdep_ols)
+  rmse_oos_rxdep:  r(rmse_oos_rxdep)
+      rmse_rxdep:  r(rmse_rxdep)
+    l1norm_rxdep:  r(l1norm_rxdep)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+  rmse_oos_swise:  r(rmse_oos_swise)
+      rmse_swise:  r(rmse_swise)
+    l1norm_swise:  r(l1norm_swise)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (300)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+..................................................   150
+..................................................   200
+..................................................   250
+..................................................   300
+(note: file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_2.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_2.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(2) alter(1)
+           delta:  r(delta)
+               s:  r(s)
+       alternate:  r(alternate)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+      shat_sxdep:  r(shat_sxdep)
+      fneg_sxdep:  r(fneg_sxdep)
+      fpos_sxdep:  r(fpos_sxdep)
+      shat_rxdep:  r(shat_rxdep)
+      fneg_rxdep:  r(fneg_rxdep)
+      fpos_rxdep:  r(fpos_rxdep)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+      shat_swise:  r(shat_swise)
+      fneg_swise:  r(fneg_swise)
+      fpos_swise:  r(fpos_swise)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sxdep~s:  r(rmse_oos_sxdep_ols)
+  rmse_sxdep_ols:  r(rmse_sxdep_ols)
+l1norm_sxdep_ols:  r(l1norm_sxdep_ols)
+  rmse_oos_sxdep:  r(rmse_oos_sxdep)
+      rmse_sxdep:  r(rmse_sxdep)
+    l1norm_sxdep:  r(l1norm_sxdep)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rxdep~s:  r(rmse_oos_rxdep_ols)
+  rmse_rxdep_ols:  r(rmse_rxdep_ols)
+l1norm_rxdep_ols:  r(l1norm_rxdep_ols)
+  rmse_oos_rxdep:  r(rmse_oos_rxdep)
+      rmse_rxdep:  r(rmse_rxdep)
+    l1norm_rxdep:  r(l1norm_rxdep)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+  rmse_oos_swise:  r(rmse_oos_swise)
+      rmse_swise:  r(rmse_swise)
+    l1norm_swise:  r(l1norm_swise)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (300)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+..................................................   150
+..................................................   200
+..................................................   250
+..................................................   300
+(note: file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_3.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_3.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(3) alter(1)
+           delta:  r(delta)
+               s:  r(s)
+       alternate:  r(alternate)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+      shat_sxdep:  r(shat_sxdep)
+      fneg_sxdep:  r(fneg_sxdep)
+      fpos_sxdep:  r(fpos_sxdep)
+      shat_rxdep:  r(shat_rxdep)
+      fneg_rxdep:  r(fneg_rxdep)
+      fpos_rxdep:  r(fpos_rxdep)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+      shat_swise:  r(shat_swise)
+      fneg_swise:  r(fneg_swise)
+      fpos_swise:  r(fpos_swise)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sxdep~s:  r(rmse_oos_sxdep_ols)
+  rmse_sxdep_ols:  r(rmse_sxdep_ols)
+l1norm_sxdep_ols:  r(l1norm_sxdep_ols)
+  rmse_oos_sxdep:  r(rmse_oos_sxdep)
+      rmse_sxdep:  r(rmse_sxdep)
+    l1norm_sxdep:  r(l1norm_sxdep)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rxdep~s:  r(rmse_oos_rxdep_ols)
+  rmse_rxdep_ols:  r(rmse_rxdep_ols)
+l1norm_rxdep_ols:  r(l1norm_rxdep_ols)
+  rmse_oos_rxdep:  r(rmse_oos_rxdep)
+      rmse_rxdep:  r(rmse_rxdep)
+    l1norm_rxdep:  r(l1norm_rxdep)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+  rmse_oos_swise:  r(rmse_oos_swise)
+      rmse_swise:  r(rmse_swise)
+    l1norm_swise:  r(l1norm_swise)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (300)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+..................................................   150
+..................................................   200
+..................................................   250
+..................................................   300
+(note: file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_4.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_4.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(5) alter(1)
+           delta:  r(delta)
+               s:  r(s)
+       alternate:  r(alternate)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+      shat_sxdep:  r(shat_sxdep)
+      fneg_sxdep:  r(fneg_sxdep)
+      fpos_sxdep:  r(fpos_sxdep)
+      shat_rxdep:  r(shat_rxdep)
+      fneg_rxdep:  r(fneg_rxdep)
+      fpos_rxdep:  r(fpos_rxdep)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+      shat_swise:  r(shat_swise)
+      fneg_swise:  r(fneg_swise)
+      fpos_swise:  r(fpos_swise)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sxdep~s:  r(rmse_oos_sxdep_ols)
+  rmse_sxdep_ols:  r(rmse_sxdep_ols)
+l1norm_sxdep_ols:  r(l1norm_sxdep_ols)
+  rmse_oos_sxdep:  r(rmse_oos_sxdep)
+      rmse_sxdep:  r(rmse_sxdep)
+    l1norm_sxdep:  r(l1norm_sxdep)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rxdep~s:  r(rmse_oos_rxdep_ols)
+  rmse_rxdep_ols:  r(rmse_rxdep_ols)
+l1norm_rxdep_ols:  r(l1norm_rxdep_ols)
+  rmse_oos_rxdep:  r(rmse_oos_rxdep)
+      rmse_rxdep:  r(rmse_rxdep)
+    l1norm_rxdep:  r(l1norm_rxdep)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+  rmse_oos_swise:  r(rmse_oos_swise)
+      rmse_swise:  r(rmse_swise)
+    l1norm_swise:  r(l1norm_swise)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (300)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+..................................................   150
+..................................................   200
+..................................................   250
+..................................................   300
+(note: file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_5.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_p100_alter1_design1_5.dta saved
+
+. *
+. 
+. timer list
+   1:    139.06 /     1500 =       0.0927
+   2:    566.16 /     1500 =       0.3774
+   3:   5247.43 /     1500 =       3.4983
+   4:   5699.61 /     1500 =       3.7997
+   5:  35435.06 /     1500 =      23.6234
+   6:  30079.45 /     1500 =      20.0530
+   8:   4474.21 /     1500 =       2.9828
+   9:    119.41 /     1500 =       0.0796
+  11:   6394.22 /     1500 =       4.2628
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Achim.Ahrens\Dropbox\statalasso\Lassopack_MC\out11\mc_log_p100_alter1_design1.log
+  log type:  text
+ closed on:  12 Oct 2018, 19:47:37
+------------------------------------------------------------------------------------------------------------------------------------------------------

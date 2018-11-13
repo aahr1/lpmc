@@ -1,0 +1,1366 @@
+-----------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc7_log.log
+  log type:  text
+ opened on:  12 Sep 2018, 09:35:31
+
+. 
+. cd
+C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current
+
+. 
+. which lasso2
+.\lasso2.ado
+*! lasso2 1.0.06 4sep2018
+*! authors aa/ms
+
+. which cvlasso
+.\cvlasso.ado
+*! lassocv 1.0.06 22apr2018
+*! authors aa/ms
+
+. which rlasso
+.\rlasso.ado
+*! rlasso 1.0.07 29aug2018
+*! authors aa/cbh/ms
+
+. which lassoutils
+.\lassoutils.ado
+*! lassoutils 1.0.14 5sep2018
+*! authors aa/cbh/ms
+
+. 
+. set seed 666
+
+. 
+. * program to calculate L1 error
+. cap program drop comparevec
+
+. program define comparevec , rclass
+  1.         syntax anything [,  NOCONStant]
+  2.         
+.         local truematname       : word 1 of `0'
+  3.         local estmatname        : word 2 of `0'
+  4. 
+.         tempname truemat estmat 
+  5.         mat `truemat'   = `truematname'
+  6.         mat `estmat'    = `estmatname'
+  7. 
+.         // compare dim
+.         local ptrue = colsof(`truemat')
+  8.         local pest  = colsof(`estmat')
+  9.         assert `ptrue'==`pest'
+ 10.         
+.         // don't include constant in L1-norm 
+.         // constant is always in last column
+.         if ("`noconstant'"=="") {
+ 11.                 local pcheck = `ptrue' -1
+ 12.         }
+ 13.         *
+.         
+.         local l1norm = 0
+ 14.         forvalues i = 1(1)`pcheck' {
+ 15.                 local l1norm = `l1norm' + abs(el(`truemat',1,`i')-el(`estmat',1,`i'))
+ 16.         }
+ 17.         return scalar l1norm = `l1norm' // l1 norm
+ 18.         
+. end
+
+. 
+. * program to calculate rmse
+. cap program drop getrmse
+
+. program define getrmse , rclass
+  1.         syntax varlist(min=2 max=2) , ///
+>                         esample(varlist min=1 max=1) // estimation smpl
+  2.         
+.         local xb                : word 1 of `varlist'
+  3.         local xbhat     : word 2 of `varlist'
+  4.         
+.         // calculate in-sample rmse
+.         tempvar pe 
+  5.         gen double `pe' = (`xb'-`xbhat')^2 if `esample'==1
+  6.         sum `pe', meanonly
+  7.         local rmse = sqrt(r(mean))
+  8.         
+.         // calculate out-of-sample rmse
+.         tempvar pe_oos
+  9.         gen double `pe_oos' = (`xb'-`xbhat')^2 if `esample'==0
+ 10.         sum `pe_oos', meanonly
+ 11.         local rmse_oos = sqrt(r(mean))
+ 12.         
+.         return scalar rmse = `rmse'                      
+ 13.         return scalar rmse_oos = `rmse_oos'
+ 14. end
+
+. 
+. 
+. cap program drop mysim
+
+. program define mysim, rclass
+  1.      syntax [, obs(integer 100)         /// total number of obs
+>                                 tobs(integer 50)        /// size of estimation sample
+>                                 p(integer 30)           /// ex constant
+>                                 design(integer 1)       /// 0 or 1
+>                                 s(integer 20)           /// sparsity (only relevant if design=1)
+>                                 delta(real 0.5)         /// determines rate at which beta decreases
+>                                                                         /// (only relevant if design!=1)
+>                                 theta(real 0.5)         /// determines corr of X
+>                                 sigma(real 1) ]
+  2. 
+.         drop _all
+  3.         
+.         /*
+>         local obs = 500 
+>         local p = 100
+>         local s = 10
+>         local sigma =1
+>         local design 1
+>         local delta = 0.5
+>         local theta = 0.5
+>         */
+.         
+.         set obs `obs'
+  4.         
+.         ** create beta
+.         tempname BETA
+  5.         if (`design'==1) {
+  6.                 // sparse beta
+.                 mat `BETA' = J(1,`p'+1,0)
+  7.                 forvalues j=1(1)`s' {
+  8.                         mat `BETA'[1,`j'] = 1
+  9.                 }
+ 10.                 *
+.                 mat `BETA'[1,`p'+1] = 1 // constant
+ 11.         }
+ 12.         else {
+ 13.                 // dense beta
+.                 // with beta(j)=(delta)^j and delta<1
+.                 mat `BETA' = J(1,`p'+1,0)
+ 14.                 forvalues j=1(1)`p' {
+ 15.                         mat `BETA'[1,`j'] = (`delta')^(`j')
+ 16.                 }
+ 17.                 *
+.                 mat `BETA'[1,`p'+1] = 1 // constant     
+ 18.         }
+ 19.         *
+.         
+.         // correlation matrix
+.         // theta controls the degree of correlation in X
+.         tempname CORR
+ 20.         tempname cvec Cmat
+ 21.         mata: `cvec'=J(1,`p',0)
+ 22.         mata: for (i=1; i<=`p'; i++) `cvec'[1,i]=(`theta')^(i-1)
+ 23.         mata: `Cmat'=Toeplitz((`cvec')',`cvec')
+ 24.         mata: st_matrix("`CORR'",`Cmat')        
+ 25.         *
+.         
+.         ************* generate data ************************************************
+.         // gen e
+.         gen double e = rnormal()*`sigma'
+ 26.         // create x
+.         drawnorm x1-x`p' , double corr(`CORR')
+ 27.         // standardize x!
+.         //tempvar xsq
+.         //gen double `xsq'=.
+.         foreach var of varlist x1-x`p' {
+ 28.                 qui sum `var' //, meanonly 
+ 29.                 replace `var' = (`var'-r(mean))/r(sd)
+ 30.         }
+ 31.         // create xb
+.         gen double f = 1 // 1 = the intercept
+ 32.         forvalues j=1(1)`p' {
+ 33.                 replace f = f + x`j'*el(`BETA',1,`j')
+ 34.         }
+ 35.         // generate y
+.         gen y = f + e 
+ 36.         drop e 
+ 37.         // estimation and validation sample
+.         tempvar esample vsample
+ 38.         gen `esample' = 0
+ 39.         replace `esample' = 1 if _n <= `tobs'
+ 40.         gen `vsample' = 0 
+ 41.         replace `vsample' = 1 if _n > `tobs'
+ 42.         ************* generate data end ********************************************
+.         
+.         // oracle estimator
+.         reg y x1-x`s' if `esample'
+ 43.         tempvar xb_oracle
+ 44.         predict double `xb_oracle', xb
+ 45.         mat beta_oracle = e(b)
+ 46.         // add zeros to create full/large beta vector
+.         mat zeros = J(1,`p'-`s',0) 
+ 47.         mat beta_oracle = (beta_oracle[1,1..`s'],zeros,beta_oracle[1,`s'+1])
+ 48.         local shat_oracle = `s'
+ 49.         ds x1-x`s'
+ 50.         local sel_oracle = r(varlist)
+ 51.         
+.         // rlasso
+.         ereturn clear
+ 52.         rlasso y x1-x`p' if `esample'
+ 53.         local shat_rlasso = e(s)
+ 54.         local sel_rlasso = e(selected)
+ 55.         tempvar xb_rlasso xb_rlasso_ols
+ 56.         predict double `xb_rlasso', xb
+ 57.         predict double `xb_rlasso_ols', xb ols
+ 58.         mat beta_rlasso         = e(betaAll)
+ 59.         mat beta_rlasso_ols     = e(betaAllOLS)
+ 60.         
+.         // sqrt rlasso
+.         ereturn clear
+ 61.         rlasso y x1-x`p' if `esample', sqrt
+ 62.         local shat_sqrt = e(s)
+ 63.         local sel_sqrt = e(selected)
+ 64.         tempvar xb_sqrt xb_sqrt_ols
+ 65.         predict double `xb_sqrt', xb
+ 66.         predict double `xb_sqrt_ols', xb ols
+ 67.         mat beta_sqrt           = e(betaAll)
+ 68.         mat beta_sqrt_ols       = e(betaAllOLS)
+ 69. 
+.         // cvlasso
+.         ereturn clear
+ 70.         cvlasso y x1-x`p' if `esample', ///
+>                                 lopt postest nfolds(5) unitl nopath
+ 71.         local shat_cvlasso = e(s)
+ 72.         local sel_cvlasso = e(selected)
+ 73.         tempvar xb_cvlasso xb_cvlasso_ols
+ 74.         predict double `xb_cvlasso', xb
+ 75.         predict double `xb_cvlasso_ols', xb ols
+ 76.         mat beta_cvlasso                = e(betaAll)
+ 77.         mat beta_cvlasso_ols    = e(betaAllOLS)
+ 78. 
+.         // cv+ridge
+.         ereturn clear
+ 79.         cvlasso y x1-x`p' if `esample', ///
+>                                 lopt postest nfolds(5) unitl nopath alpha(0)
+ 80.         local shat_cvridge = e(s)
+ 81.         local sel_cvridge = e(selected)
+ 82.         tempvar xb_cvridge 
+ 83.         predict double `xb_cvridge', xb
+ 84.         mat beta_cvridge        = e(betaAll)
+ 85.         
+.         // cv+elastic
+.         ereturn clear
+ 86.         cvlasso y x1-x`p' if `esample', ///
+>                                 lopt postest nfolds(5) unitl nopath alpha(0.1 0.5 0.9)
+ 87.         local shat_cvelastic = e(s)
+ 88.         local sel_cvelastic = e(selected)
+ 89.         tempvar xb_cvelastic xb_cvelastic_ols
+ 90.         predict double `xb_cvelastic', xb
+ 91.         predict double `xb_cvelastic_ols', xb ols
+ 92.         mat beta_cvelastic              = e(betaAll)
+ 93.         mat beta_cvelastic_ols  = e(betaAllOLS)
+ 94. 
+.         // lasso2 
+.         tempname lasso2est
+ 95.         ereturn clear
+ 96.         lasso2 y x1-x`p' if `esample', unitl 
+ 97.         estimates store `lasso2est'
+ 98.                 // with aic 
+.                 lasso2, lic(aic) postest
+ 99.                 local shat_aic = e(s)
+100.                 local sel_aic = e(selected)
+101.                 tempvar xb_aic xb_aic_ols
+102.                 predict double `xb_aic', xb
+103.                 predict double `xb_aic_ols', xb  ols
+104.                 mat beta_aic            = e(betaAll)
+105.                 mat beta_aic_ols        = e(betaAllOLS)
+106.                 // with bic
+.                 estimates restore `lasso2est'
+107.                 lasso2, lic(bic) postest
+108.                 local shat_bic = e(s)
+109.                 local sel_bic = e(selected)
+110.                 tempvar xb_bic xb_bic_ols
+111.                 predict double `xb_bic', xb
+112.                 predict double `xb_bic_ols', xb ols
+113.                 mat beta_bic            = e(betaAll)
+114.                 mat beta_bic_ols        = e(betaAllOLS)
+115.                 // with ebic
+.                 estimates restore `lasso2est'
+116.                 lasso2, lic(ebic) postest
+117.                 local shat_ebic = e(s)
+118.                 local sel_ebic = e(selected)
+119.                 tempvar xb_ebic xb_ebic_ols
+120.                 predict double `xb_ebic', xb
+121.                 predict double `xb_ebic_ols', xb ols
+122.                 mat beta_ebic           = e(betaAll)
+123.                 mat beta_ebic_ols       = e(betaAllOLS)
+124.                 // with aicc
+.                 estimates restore `lasso2est'
+125.                 lasso2, lic(aicc) postest
+126.                 local shat_aicc = e(s)
+127.                 local sel_aicc = e(selected)
+128.                 tempvar xb_aicc xb_aicc_ols
+129.                 predict double `xb_aicc', xb
+130.                 predict double `xb_aicc_ols', xb ols
+131.                 mat beta_aicc           = e(betaAll)
+132.                 mat beta_aicc_ols       = e(betaAllOLS)
+133.         
+.         ereturn clear // otherwise lasso2/cvlasso/results are returned
+134.         
+.         ** calculate false positive and false negative
+.         foreach mthd of newlist  ebic aic bic aicc /// 
+>                                                         cvlasso cvelastic ///
+>                                                         rlasso sqrt ///
+>                                                         {
+135.                 if (`design'==1) {
+136.                         local fpos_vars: list sel_`mthd' - sel_oracle                           
+137.                         local fneg_vars: list sel_oracle - sel_`mthd' 
+138.                         local fpos_`mthd'       : word count `fpos_vars'
+139.                         local fneg_`mthd'       : word count `fneg_vars'
+140.                 }
+141.                 else {
+142.                         local fpos_`mthd' = -1
+143.                         local fneg_`mthd' = -1
+144.                 }
+145.         
+.         }
+146.         *
+.         *** calculate L1norm and RMSE
+.         foreach mthd of newlist oracle ///
+>                                                         rlasso rlasso_ols ///
+>                                                         sqrt sqrt_ols ///
+>                                                         cvlasso cvlasso_ols ///
+>                                                         cvridge ///
+>                                                         cvelastic cvelastic_ols ///
+>                                                         aic aic_ols /// 
+>                                                         bic bic_ols ///
+>                                                         aicc aicc_ols ///
+>                                                         ebic ebic_ols {
+147.                 
+.                 // compare true beta and beta-hat
+.                 comparevec `BETA' beta_`mthd' 
+148.                 local l1norm_`mthd'     = r(l1norm)
+149.                 return scalar l1norm_`mthd'     =`l1norm_`mthd'' 
+150.                 
+.                 // get rmse
+.                 getrmse f `xb_`mthd'', esample(`esample')
+151.                 local rmse_`mthd'               = r(rmse)
+152.                 local rmse_oos_`mthd'   = r(rmse_oos)           
+153.                 return scalar rmse_`mthd'               =`rmse_`mthd'' 
+154.                 return scalar rmse_oos_`mthd'   =`rmse_oos_`mthd'' 
+155.         }
+156.         *
+.         *** return fpos, fneg and shat
+.         foreach mthd of newlist  ebic aic bic aicc /// 
+>                                                         cvlasso cvelastic ///
+>                                                         rlasso sqrt ///
+>                                                         {
+157.         
+.                 return scalar fpos_`mthd' = `fpos_`mthd''
+158.                 return scalar fneg_`mthd' = `fneg_`mthd''
+159.                 return scalar shat_`mthd' = `shat_`mthd''
+160.         }
+161.         *
+.         // return simulation parameters
+.         return scalar obs = `obs'
+162.         return scalar p = `p'
+163.         return scalar design = `design'
+164.         return scalar sigma = `sigma'
+165.         return scalar theta = `theta'
+166.         if (`design'==1) {
+167.                 return scalar s = `s'
+168.                 return scalar delta = -1
+169.         }
+170.         else {
+171.                 return scalar s = -1
+172.                 return scalar delta = `delta'
+173.         }
+174.         //
+.         //for debugging
+.         //return matrix trueb = `BETA'
+.         //return matrix ols = beta_oracle
+.         //return matrix rlassools = beta_rlasso_ols
+.         *
+. end
+
+. 
+. ***************** end of program definitions ***********************************
+. 
+. local mc=1
+
+. foreach s in 0.5 1 2 3 5 {
+  2.         
+.         simulate , reps(100): mysim, obs(400) tobs(200) p(100) design(1) sigma(`s') theta(.7)
+  3.         save "`c(pwd)'\Do_files\mc7\mc_`mc'.dta", replace
+  4.         local mc = `mc' + 1     
+  5.         
+.         simulate , reps(100): mysim, obs(400) tobs(200) p(100) design(2) sigma(`s') theta(.7)
+  6.         save "`c(pwd)'\Do_files\mc7\mc_`mc'.dta", replace
+  7.         local mc = `mc' + 1     
+  8.         
+. }
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(0.5) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_1.dta saved
+Warning: lse is at the limit of the lambda range.
+
+         command:  mysim, obs(400) tobs(200) p(100) design(2) sigma(0.5) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_2.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(1) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_3.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_3.dta saved
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+
+         command:  mysim, obs(400) tobs(200) p(100) design(2) sigma(1) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_4.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_4.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(2) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_5.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_5.dta saved
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+
+         command:  mysim, obs(400) tobs(200) p(100) design(2) sigma(2) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_6.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_6.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(3) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_7.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_7.dta saved
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+
+         command:  mysim, obs(400) tobs(200) p(100) design(2) sigma(3) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_8.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_8.dta saved
+
+         command:  mysim, obs(400) tobs(200) p(100) design(1) sigma(5) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_9.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_9.dta saved
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+Warning: lopt is at the limit of the lambda range.
+Warning: lse is at the limit of the lambda range.
+
+         command:  mysim, obs(400) tobs(200) p(100) design(2) sigma(5) theta(.7)
+           delta:  r(delta)
+               s:  r(s)
+           theta:  r(theta)
+           sigma:  r(sigma)
+          design:  r(design)
+               p:  r(p)
+             obs:  r(obs)
+       shat_sqrt:  r(shat_sqrt)
+       fneg_sqrt:  r(fneg_sqrt)
+       fpos_sqrt:  r(fpos_sqrt)
+     shat_rlasso:  r(shat_rlasso)
+     fneg_rlasso:  r(fneg_rlasso)
+     fpos_rlasso:  r(fpos_rlasso)
+  shat_cvelastic:  r(shat_cvelastic)
+  fneg_cvelastic:  r(fneg_cvelastic)
+  fpos_cvelastic:  r(fpos_cvelastic)
+    shat_cvlasso:  r(shat_cvlasso)
+    fneg_cvlasso:  r(fneg_cvlasso)
+    fpos_cvlasso:  r(fpos_cvlasso)
+       shat_aicc:  r(shat_aicc)
+       fneg_aicc:  r(fneg_aicc)
+       fpos_aicc:  r(fpos_aicc)
+        shat_bic:  r(shat_bic)
+        fneg_bic:  r(fneg_bic)
+        fpos_bic:  r(fpos_bic)
+        shat_aic:  r(shat_aic)
+        fneg_aic:  r(fneg_aic)
+        fpos_aic:  r(fpos_aic)
+       shat_ebic:  r(shat_ebic)
+       fneg_ebic:  r(fneg_ebic)
+       fpos_ebic:  r(fpos_ebic)
+rmse_oos_ebic_~s:  r(rmse_oos_ebic_ols)
+   rmse_ebic_ols:  r(rmse_ebic_ols)
+ l1norm_ebic_ols:  r(l1norm_ebic_ols)
+   rmse_oos_ebic:  r(rmse_oos_ebic)
+       rmse_ebic:  r(rmse_ebic)
+     l1norm_ebic:  r(l1norm_ebic)
+rmse_oos_aicc_~s:  r(rmse_oos_aicc_ols)
+   rmse_aicc_ols:  r(rmse_aicc_ols)
+ l1norm_aicc_ols:  r(l1norm_aicc_ols)
+   rmse_oos_aicc:  r(rmse_oos_aicc)
+       rmse_aicc:  r(rmse_aicc)
+     l1norm_aicc:  r(l1norm_aicc)
+rmse_oos_bic_ols:  r(rmse_oos_bic_ols)
+    rmse_bic_ols:  r(rmse_bic_ols)
+  l1norm_bic_ols:  r(l1norm_bic_ols)
+    rmse_oos_bic:  r(rmse_oos_bic)
+        rmse_bic:  r(rmse_bic)
+      l1norm_bic:  r(l1norm_bic)
+rmse_oos_aic_ols:  r(rmse_oos_aic_ols)
+    rmse_aic_ols:  r(rmse_aic_ols)
+  l1norm_aic_ols:  r(l1norm_aic_ols)
+    rmse_oos_aic:  r(rmse_oos_aic)
+        rmse_aic:  r(rmse_aic)
+      l1norm_aic:  r(l1norm_aic)
+rmse_oos_cvela~s:  r(rmse_oos_cvelastic_ols)
+rmse_cvelastic~s:  r(rmse_cvelastic_ols)
+l1norm_cvelast~s:  r(l1norm_cvelastic_ols)
+rmse_oos_cvela~c:  r(rmse_oos_cvelastic)
+  rmse_cvelastic:  r(rmse_cvelastic)
+l1norm_cvelastic:  r(l1norm_cvelastic)
+rmse_oos_cvridge:  r(rmse_oos_cvridge)
+    rmse_cvridge:  r(rmse_cvridge)
+  l1norm_cvridge:  r(l1norm_cvridge)
+rmse_oos_cvlas~s:  r(rmse_oos_cvlasso_ols)
+rmse_cvlasso_ols:  r(rmse_cvlasso_ols)
+l1norm_cvlasso~s:  r(l1norm_cvlasso_ols)
+rmse_oos_cvlasso:  r(rmse_oos_cvlasso)
+    rmse_cvlasso:  r(rmse_cvlasso)
+  l1norm_cvlasso:  r(l1norm_cvlasso)
+rmse_oos_sqrt_~s:  r(rmse_oos_sqrt_ols)
+   rmse_sqrt_ols:  r(rmse_sqrt_ols)
+ l1norm_sqrt_ols:  r(l1norm_sqrt_ols)
+   rmse_oos_sqrt:  r(rmse_oos_sqrt)
+       rmse_sqrt:  r(rmse_sqrt)
+     l1norm_sqrt:  r(l1norm_sqrt)
+rmse_oos_rlass~s:  r(rmse_oos_rlasso_ols)
+ rmse_rlasso_ols:  r(rmse_rlasso_ols)
+l1norm_rlasso_~s:  r(l1norm_rlasso_ols)
+ rmse_oos_rlasso:  r(rmse_oos_rlasso)
+     rmse_rlasso:  r(rmse_rlasso)
+   l1norm_rlasso:  r(l1norm_rlasso)
+ rmse_oos_oracle:  r(rmse_oos_oracle)
+     rmse_oracle:  r(rmse_oracle)
+   l1norm_oracle:  r(l1norm_oracle)
+
+Simulations (100)
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+(note: file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_10.dta not found)
+file C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc_10.dta saved
+
+. *
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Achim.Ahrens\Dropbox\StataLasso\Current\Do_files\mc7\mc7_log.log
+  log type:  text
+ closed on:  13 Sep 2018, 05:55:58
+-----------------------------------------------------------------------------------------------------------------------------
